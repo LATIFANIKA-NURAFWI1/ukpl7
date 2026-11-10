@@ -104,9 +104,14 @@ class BookingService
         }
 
         $booking->update([
-            'status' => 'dibatalkan',
-            'refund_amount' => $refundAmount
+            'status'        => 'dibatalkan',
+            'refund_amount' => $refundAmount,
+            'cancelled_at'  => now(),
         ]);
+
+        // FIX: Hapus slot dari booking_slots agar slot bisa dipesan ulang
+        // Tanpa ini, constraint uk_slot akan memblokir booking baru pada slot yang sama
+        $booking->slots()->delete();
 
         return $booking;
     }

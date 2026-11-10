@@ -19,6 +19,9 @@ class Booking extends Model
         'end_time',
         'duration_hours',
         'total_price',
+        'payment_type',       // FIX: ditambahkan agar tidak terkena mass-assignment bug
+        'amount_paid',        // FIX: ditambahkan agar nilai DP/full tersimpan
+        'remaining_payment',  // FIX: ditambahkan agar sisa bayar tersimpan
         'payment_proof',
         'status',
         'refund_amount',

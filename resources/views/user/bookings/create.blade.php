@@ -80,25 +80,34 @@
                     <input type="hidden" name="booking_date" value="{{ $date }}">
 
                     <div class="slot-grid" style="margin-bottom:24px">
+                        @php $oldHours = array_map('intval', (array) old('hours', [])); @endphp
                         @for($h=8;$h<=21;$h++)
                             @php
-                                $isBooked = in_array($h,$bookedSlots);
+                                $isBooked = in_array($h, $bookedSlots);
+                                $isPast   = in_array($h, $pastSlots ?? []);
                                 $isPeak   = $h >= 17;
                                 $price    = $isPeak ? $field->price_peak : $field->price_offpeak;
                                 if($isWeekend) $price *= 1.2;
                                 $priceK   = number_format($price/1000,0).'rb';
+                                $isChecked = !$isBooked && !$isPast && in_array($h, $oldHours, true);
                             @endphp
                             @if($isBooked)
-                                <div class="slot-btn booked">
+                                <div class="slot-btn booked" title="Sudah dipesan">
                                     <span class="sh">{{ sprintf('%02d',$h) }}:00</span>
                                     <span class="sp">Penuh</span>
+                                </div>
+                            @elseif($isPast)
+                                <div class="slot-btn booked" title="Jam sudah lewat">
+                                    <span class="sh">{{ sprintf('%02d',$h) }}:00</span>
+                                    <span class="sp">Lewat</span>
                                 </div>
                             @else
                                 <input type="checkbox" name="hours[]" value="{{ $h }}"
                                     id="slot_{{ $h }}" class="d-none slot-checkbox"
+                                    {{ $isChecked ? 'checked' : '' }}
                                     onchange="updateSummary()">
                                 <label for="slot_{{ $h }}"
-                                    class="slot-btn {{ $isPeak ? 'peak' : 'available' }}"
+                                    class="slot-btn {{ $isChecked ? 'selected' : ($isPeak ? 'peak' : 'available') }}"
                                     title="Rp {{ number_format($price,0,',','.') }}">
                                     <span class="sh">{{ sprintf('%02d',$h) }}:00</span>
                                     <span class="sp">{{ $priceK }}</span>
@@ -107,39 +116,26 @@
                         @endfor
                     </div>
 
-                    <div class="mb-3">
-                        <label class="form-label fw-bold">Metode Pembayaran</label>
-                        <div class="form-check">
-                            <input class="form-check-input" type="radio" name="payment_type" id="full" value="full" checked onchange="updateSummary()">
-                            <label class="form-check-label" for="full">
-                                Lunas (100%) - <span class="text-success" id="text-price-full">Rp 0</span>
-                            </label>
-                        </div>
-                        <div class="form-check">
-                            <input class="form-check-input" type="radio" name="payment_type" id="dp" value="dp" onchange="updateSummary()">
-                            <label class="form-check-label" for="dp">
-                                DP (50%) - <span class="text-primary" id="text-price-dp">Rp 0</span>
-                            </label>
-                        </div>
-                    </div>
-
+                    @php $oldPayment = old('payment_type', 'full'); @endphp
                     <div class="card-sb" style="background:#1a2234; border:1px solid #1e2d45; margin-bottom:20px; padding:16px">
                         <div class="form-label" style="margin-bottom:12px; font-size:.8rem">
                             <i class="fas fa-wallet" style="color:#f59e0b; margin-right:6px"></i>METODE PEMBAYARAN
                         </div>
-                        <div style="display:flex; gap:15px">
-                            <label style="flex:1; cursor:pointer">
-                                <input type="radio" name="payment_type" value="full" class="d-none payment-radio" checked onchange="updateSummary()">
+                        <div style="display:flex; gap:12px; flex-wrap:wrap">
+                            <label for="full" style="flex:1; min-width:180px; cursor:pointer">
+                                <input type="radio" name="payment_type" id="full" value="full" class="d-none payment-radio" {{ $oldPayment === 'full' ? 'checked' : '' }} onchange="updateSummary()">
                                 <div class="payment-box">
-                                    <div style="font-weight:700; font-size:.85rem">Lunas (100%)</div>
+                                    <div style="font-weight:700; font-size:.85rem; color:#e2e8f0">Lunas (100%)</div>
                                     <div style="font-size:.75rem; color:#64748b">Bayar penuh sekarang</div>
+                                    <div style="font-size:.82rem; font-weight:700; color:#00d4aa; margin-top:4px" id="text-price-full">Rp 0</div>
                                 </div>
                             </label>
-                            <label style="flex:1; cursor:pointer">
-                                <input type="radio" name="payment_type" value="dp" class="d-none payment-radio" onchange="updateSummary()">
+                            <label for="dp" style="flex:1; min-width:180px; cursor:pointer">
+                                <input type="radio" name="payment_type" id="dp" value="dp" class="d-none payment-radio" {{ $oldPayment === 'dp' ? 'checked' : '' }} onchange="updateSummary()">
                                 <div class="payment-box">
-                                    <div style="font-weight:700; font-size:.85rem">DP (50%)</div>
+                                    <div style="font-weight:700; font-size:.85rem; color:#e2e8f0">DP (50%)</div>
                                     <div style="font-size:.75rem; color:#64748b">Sisa bayar di lokasi</div>
+                                    <div style="font-size:.82rem; font-weight:700; color:#0ea5e9; margin-top:4px" id="text-price-dp">Rp 0</div>
                                 </div>
                             </label>
                         </div>
@@ -153,7 +149,7 @@
                             <i class="fas fa-exclamation-triangle" style="margin-right:6px"></i>Slot harus berurutan! Contoh: 09:00, 10:00, 11:00 — tidak boleh ada jeda.
                         </div>
                         <div style="border-top:1px solid #1e2d45;margin-top:12px;padding-top:12px;display:flex;justify-content:space-between;align-items:center">
-                            <span style="font-size:.82rem;color:#94a3b8">Total Pembayaran</span>
+                            <span style="font-size:.82rem;color:#94a3b8" id="summaryLabel">Total Pembayaran</span>
                             <span id="summaryTotal" style="font-size:1.1rem;font-weight:800;color:#00d4aa">Rp 0</span>
                         </div>
                     </div>
@@ -209,6 +205,23 @@
 </div>
 @endsection
 
+@push('styles')
+<style>
+.payment-box {
+    background: #111827;
+    border: 1px solid #1e2d45;
+    border-radius: 10px;
+    padding: 12px 14px;
+    transition: all .2s;
+}
+.payment-radio:checked + .payment-box {
+    border-color: #00d4aa;
+    background: rgba(0, 212, 170, .08);
+    box-shadow: 0 0 0 2px rgba(0, 212, 170, .15);
+}
+</style>
+@endpush
+
 @push('scripts')
 <script>
 const slotPrices = {
@@ -226,13 +239,23 @@ function updateSummary() {
     let ok = true;
     for(let i=1;i<hours.length;i++) { if(hours[i]-hours[i-1]!==1){ok=false;break;} }
 
-    const box    = document.getElementById('summaryBox');
-    const warn   = document.getElementById('contiguousWarn');
-    const btn    = document.getElementById('submitBtn');
-    const slotsDiv = document.getElementById('summarySlots');
-    const totalEl  = document.getElementById('summaryTotal');
+    const box       = document.getElementById('summaryBox');
+    const warn      = document.getElementById('contiguousWarn');
+    const btn       = document.getElementById('submitBtn');
+    const slotsDiv  = document.getElementById('summarySlots');
+    const totalEl   = document.getElementById('summaryTotal');
+    const labelEl   = document.getElementById('summaryLabel');
+    const fullPrice = document.getElementById('text-price-full');
+    const dpPrice   = document.getElementById('text-price-dp');
 
-    if(!hours.length){ box.style.display='none'; btn.disabled=true; btn.innerHTML='<i class="fas fa-calendar-check"></i>Buat Booking'; return; }
+    if(!hours.length){
+        box.style.display='none';
+        btn.disabled=true;
+        btn.innerHTML='<i class="fas fa-calendar-check"></i>Buat Booking';
+        fullPrice.textContent='Rp 0';
+        dpPrice.textContent='Rp 0';
+        return;
+    }
 
     let total=0, html='';
     hours.forEach(h=>{
@@ -249,14 +272,20 @@ function updateSummary() {
         </div>`;
     });
 
+    const isDp = document.querySelector('input[name="payment_type"]:checked')?.value === 'dp';
+    const payable = isDp ? total * 0.5 : total;
+
+    fullPrice.textContent = 'Rp ' + total.toLocaleString('id-ID');
+    dpPrice.textContent = 'Rp ' + (total * 0.5).toLocaleString('id-ID');
     slotsDiv.innerHTML = html;
-    totalEl.textContent = 'Rp '+total.toLocaleString('id-ID');
+    labelEl.textContent = isDp ? 'Bayar Sekarang (DP 50%)' : 'Total Pembayaran (Lunas)';
+    totalEl.textContent = 'Rp ' + payable.toLocaleString('id-ID');
     box.style.display = 'block';
     warn.style.display = ok ? 'none' : 'block';
     btn.disabled = !ok;
 
     if(ok && hours.length>0){
-        btn.innerHTML=`<i class="fas fa-calendar-check"></i>Booking ${hours.length} Slot — Rp ${total.toLocaleString('id-ID')}`;
+        btn.innerHTML=`<i class="fas fa-calendar-check"></i>Booking ${hours.length} Slot — Rp ${payable.toLocaleString('id-ID')}`;
     } else if(!ok){
         btn.innerHTML='<i class="fas fa-exclamation-triangle"></i>Slot harus berurutan!';
     }
@@ -273,5 +302,7 @@ document.querySelectorAll('.slot-checkbox').forEach(cb=>{
         }
     });
 });
+
+document.addEventListener('DOMContentLoaded', updateSummary);
 </script>
 @endpush

@@ -10,6 +10,22 @@ class Booking extends Model
 {
     use HasFactory;
 
+    public const STATUS_LABELS = [
+        'menunggu_pembayaran' => 'Menunggu Pembayaran',
+        'terkonfirmasi'       => 'Terkonfirmasi',
+        'selesai'             => 'Selesai',
+        'dibatalkan'          => 'Dibatalkan',
+        'refund'              => 'Refund',
+    ];
+
+    public const ALLOWED_TRANSITIONS = [
+        'menunggu_pembayaran' => ['terkonfirmasi', 'dibatalkan'],
+        'terkonfirmasi'       => ['selesai', 'dibatalkan', 'refund'],
+        'dibatalkan'          => ['refund'],
+        'selesai'             => [],
+        'refund'              => [],
+    ];
+
     protected $fillable = [
         'booking_code',
         'user_id',
@@ -29,10 +45,12 @@ class Booking extends Model
     ];
 
     protected $casts = [
-        'booking_date' => 'date',
-        'cancelled_at' => 'datetime',
-        'total_price'  => 'float',
-        'refund_amount'=> 'float',
+        'booking_date'      => 'date',
+        'cancelled_at'      => 'datetime',
+        'total_price'       => 'float',
+        'amount_paid'       => 'float',
+        'remaining_payment' => 'float',
+        'refund_amount'     => 'float',
     ];
 
     public function user()
@@ -77,15 +95,28 @@ class Booking extends Model
         };
     }
 
+    public static function labelForStatus(string $status): string
+    {
+        return self::STATUS_LABELS[$status] ?? ucfirst($status);
+    }
+
     public function statusLabel(): string
     {
-        return match ($this->status) {
-            'menunggu_pembayaran' => 'Menunggu Pembayaran',
-            'terkonfirmasi'       => 'Terkonfirmasi',
-            'selesai'             => 'Selesai',
-            'dibatalkan'          => 'Dibatalkan',
-            'refund'              => 'Refund',
-            default               => ucfirst($this->status),
-        };
+        return self::labelForStatus($this->status);
+    }
+
+    /**
+     * Daftar status tujuan yang diizinkan dari status saat ini.
+     *
+     * @return list<string>
+     */
+    public function allowedNextStatuses(): array
+    {
+        return self::ALLOWED_TRANSITIONS[$this->status] ?? [];
+    }
+
+    public function canTransitionTo(string $targetStatus): bool
+    {
+        return in_array($targetStatus, $this->allowedNextStatuses(), true);
     }
 }

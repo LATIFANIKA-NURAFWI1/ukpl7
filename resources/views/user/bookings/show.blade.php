@@ -49,7 +49,24 @@
 
                 {{-- Slot Breakdown --}}
                 <div style="font-size:.75rem;font-weight:700;color:#64748b;letter-spacing:.08em;text-transform:uppercase;margin-bottom:10px">Rincian Slot</div>
-                @foreach($booking->slots->sortBy('slot_hour') as $slot)
+                @forelse($booking->slots->sortBy('slot_hour') as $slot)
+                <div style="display:flex;justify-content:space-between;align-items:center;padding:8px 12px;border-bottom:1px solid #1a2234;font-size:.82rem">
+                    <div style="display:flex;align-items:center;gap:8px">
+                        <span class="mono" style="color:#e2e8f0">{{ sprintf('%02d:00 – %02d:00', $slot->slot_hour, $slot->slot_hour + 1) }}</span>
+                        @if($slot->slot_hour >= 17)
+                            <span class="badge-sb badge-yellow">Peak Hour</span>
+                        @else
+                            <span class="badge-sb badge-green">Off-Peak</span>
+                        @endif
+                    </div>
+                    <span style="font-weight:600;color:#e2e8f0">Rp {{ number_format($slot->price,0,',','.') }}</span>
+                </div>
+                @empty
+                <div style="padding:8px 12px;font-size:.78rem;color:#64748b">
+                    Slot {{ substr($booking->start_time,0,5) }} – {{ substr($booking->end_time,0,5) }} ({{ $booking->duration_hours }} jam)
+                </div>
+                @endforelse
+
                 {{-- Rincian Pembayaran Lengkap --}}
                 <div style="margin-top:12px; padding:12px; background:rgba(13, 21, 38, 0.5); border-radius:10px; border:1px solid #1e2d45">
                     <div style="display:flex;justify-content:space-between;margin-bottom:6px">
@@ -69,7 +86,6 @@
                     </div>
                     @endif
                 </div>
-                @endforeach
                 <div style="display:flex;justify-content:space-between;padding:10px 12px;margin-top:6px;border-top:1px solid #1e2d45">
                     <span style="font-weight:700;color:#94a3b8;font-size:.82rem">Total</span>
                     <span style="font-weight:800;color:#00d4aa;font-size:.9rem">Rp {{ number_format($booking->total_price,0,',','.') }}</span>
@@ -129,7 +145,9 @@
         {{-- Batalkan --}}
         @if(in_array($booking->status,['menunggu_pembayaran','terkonfirmasi']))
         @php
-            $bookingStart = \Carbon\Carbon::parse($booking->booking_date->format('Y-m-d').' '.$booking->start_time);
+            $earliestHour = $booking->slots->min('slot_hour');
+            $startTimeStr = $earliestHour !== null ? sprintf('%02d:00:00', (int) $earliestHour) : $booking->start_time;
+            $bookingStart = \Carbon\Carbon::parse($booking->booking_date->format('Y-m-d').' '.$startTimeStr);
             $hoursLeft    = now()->diffInHours($bookingStart,false);
         @endphp
         <div class="card-sb fade-in-3" style="border-color:rgba(239,68,68,.2)">

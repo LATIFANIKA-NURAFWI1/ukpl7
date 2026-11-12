@@ -108,18 +108,27 @@
         <div class="card-sb fade-in-2">
             <div class="card-sb-header"><div class="card-sb-title"><div class="dot" style="background:#f59e0b"></div>Update Status</div></div>
             <div class="card-sb-body">
+                @php $allowedStatuses = $booking->allowedNextStatuses(); @endphp
+                @if(count($allowedStatuses) > 0)
                 <form action="{{ route('admin.bookings.update',$booking) }}" method="POST">
                     @csrf @method('PATCH')
                     <div style="margin-bottom:14px">
-                        <div class="form-label">Status Booking</div>
-                        <select name="status" class="form-select">
-                            @foreach(['menunggu_pembayaran'=>'Menunggu Pembayaran','terkonfirmasi'=>'Terkonfirmasi','selesai'=>'Selesai','dibatalkan'=>'Dibatalkan','refund'=>'Refund'] as $v=>$l)
-                            <option value="{{ $v }}" {{ $booking->status==$v?'selected':'' }}>{{ $l }}</option>
+                        <div class="form-label">Status Saat Ini: <strong>{{ $booking->statusLabel() }}</strong></div>
+                        <select name="status" class="form-select" required>
+                            <option value="" disabled selected>-- Pilih status baru --</option>
+                            @foreach($allowedStatuses as $v)
+                            <option value="{{ $v }}">{{ \App\Models\Booking::labelForStatus($v) }}</option>
                             @endforeach
                         </select>
                     </div>
                     <button type="submit" class="btn-warning-sb" style="width:100%;justify-content:center"><i class="fas fa-save"></i>Simpan Status</button>
                 </form>
+                @else
+                <div class="alert-sb alert-sb-info" style="margin-bottom:0">
+                    <i class="fas fa-lock" style="flex-shrink:0;margin-top:2px"></i>
+                    <div>Status <strong>{{ $booking->statusLabel() }}</strong> bersifat final dan tidak dapat diubah lagi.</div>
+                </div>
+                @endif
             </div>
         </div>
     </div>

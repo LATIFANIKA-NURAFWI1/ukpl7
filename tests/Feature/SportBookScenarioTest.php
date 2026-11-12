@@ -196,8 +196,12 @@ class SportBookScenarioTest extends TestCase
         // Booking kedua untuk slot yang sama harus gagal
         $responseB = $this->makeBookingRequest($userB, $field, $date, [19]);
 
-        // Percobaan kedua wajib gagal dengan pesan yang rapi, BUKAN error 500
-        $responseB->assertSessionHasErrors();
+        // Percobaan kedua wajib gagal dengan pesan yang rapi, BUKAN error 500 atau SQLSTATE mentah
+        $responseB->assertSessionHasErrors('hours');
+        $errorMessage = session('errors')->first('hours');
+        $this->assertStringNotContainsString('SQLSTATE', $errorMessage);
+        $this->assertStringNotContainsString('Duplicate entry', $errorMessage);
+        $this->assertStringContainsString('sudah dipesan', strtolower($errorMessage));
 
         // Pastikan hanya ada 1 slot di database
         $this->assertEquals(
@@ -474,11 +478,10 @@ class SportBookScenarioTest extends TestCase
         $this->assertEquals('dibatalkan', $booking->status);
 
         // 18 jam = antara 12-24 jam → refund 50%
-        if ($booking->amount_paid > 0) {
-            $expectedRefund = $booking->amount_paid * 0.5;
-            $this->assertEquals($expectedRefund, $booking->refund_amount,
-                'Refund 50% karena pembatalan 12-24 jam sebelum jadwal');
-        }
+        $this->assertGreaterThan(0, $booking->amount_paid);
+        $expectedRefund = $booking->amount_paid * 0.5;
+        $this->assertEquals($expectedRefund, $booking->refund_amount,
+            'Refund 50% karena pembatalan 12-24 jam sebelum jadwal');
 
         Carbon::setTestNow(); // Reset waktu
     }
@@ -797,16 +800,13 @@ class SportBookScenarioTest extends TestCase
     }
 
     /**
-     * TC-INT-23 [PREDIKSI: PASS — status transitions tanpa business rules]
+     * TC-INT-23 [FIXED: BUG-006]
      *
-     * SKENARIO: Admin set status langsung ke 'selesai' tanpa melewati 'terkonfirmasi'
-     * KOMPONEN: Admin\BookingController::update() — validasi hanya cek enum, tanpa state machine
-     * RISIKO DIUJI: R5 (Unvalidated status transition) — admin bisa lompat status
-     *
-     * Test ini MENDOKUMENTASIKAN bahwa tidak ada state machine validation.
-     * Jika berhasil (PASS), itu berarti bug R5 terkonfirmasi — status bisa dilompat.
+     * SKENARIO: Admin tidak boleh melompati status langsung dari 'menunggu_pembayaran' ke 'selesai'
+     * KOMPONEN: Admin\BookingController::update() → Booking::canTransitionTo()
+     * RISIKO DIUJI: R5 (State machine validation) — urutan status wajib divalidasi
      */
-    public function test_TC_INT_23_admin_can_skip_status_without_state_machine(): void
+    public function test_TC_INT_23_admin_cannot_skip_status_with_state_machine(): void
     {
         $admin   = $this->createUser('admin');
         $user    = $this->createUser();
@@ -817,18 +817,17 @@ class SportBookScenarioTest extends TestCase
             'status'   => 'menunggu_pembayaran',
         ]);
 
-        // Langsung set ke 'selesai' tanpa melewati 'terkonfirmasi'
+        // Coba langsung set ke 'selesai' tanpa melewati 'terkonfirmasi'
         $response = $this->actingAs($admin)->patch(
             route('admin.bookings.update', $booking),
             ['status' => 'selesai']
         );
 
-        $booking->refresh();
+        $response->assertSessionHasErrors('status');
 
-        // Jika PASS = bug R5 terkonfirmasi (tidak ada state machine)
-        // Jika FAIL = ada state machine validation yang kita tidak tahu
-        $this->assertEquals('selesai', $booking->status,
-            'Tanpa state machine, admin bisa langsung set status ke selesai');
+        $booking->refresh();
+        $this->assertEquals('menunggu_pembayaran', $booking->status,
+            'State machine wajib menolak lompatan langsung ke selesai');
     }
 
     // =====================================================================
@@ -1122,5 +1121,272 @@ class SportBookScenarioTest extends TestCase
 
         // Controller memanggil abort_if(!$field->is_active, 404)
         $response->assertNotFound(); // HTTP 404
+    }
+
+    /*
+    |==========================================================================
+    | BAGIAN C: VERIFIKASI PERBAIKAN UAT (BUG-003 s.d. BUG-007)
+    |==========================================================================
+    */
+
+    /**
+     * TC-INT-26 [BUG-003 / AC-2, AC-4]
+     * Memastikan QueryException (SQLSTATE[23000]) yang dilempar pada level DB
+     * tetap diterjemahkan ke pesan ramah pengguna, bukan pesan SQL mentah.
+     */
+    public function test_TC_INT_26_double_booking_returns_friendly_error_message_without_sql(): void
+    {
+        $userA = $this->createUser();
+        $userB = $this->createUser();
+        $field = $this->createField();
+        $date  = now()->addDays(2)->toDateString();
+
+        $this->makeBookingRequest($userA, $field, $date, [15])->assertSessionDoesntHaveErrors();
+
+        $responseB = $this->makeBookingRequest($userB, $field, $date, [15]);
+        $responseB->assertSessionHasErrors('hours');
+
+        $message = session('errors')->first('hours');
+        $this->assertStringNotContainsString('SQLSTATE', $message);
+        $this->assertStringNotContainsString('23000', $message);
+        $this->assertStringContainsString('sudah dipesan', strtolower($message));
+    }
+
+    /**
+     * TC-INT-27 [BUG-004 / AC-2]
+     * Atomisitas transaksi: saat multi-slot bentrok di tengah ([10, 11, 12] vs [11]),
+     * DB::transaction mencegah baris booking yatim (tanpa slot) atau slot parsial [10].
+     */
+    public function test_TC_INT_27_multi_slot_conflict_rolls_back_atomically_without_orphan_booking(): void
+    {
+        $userA = $this->createUser();
+        $userB = $this->createUser();
+        $field = $this->createField();
+        $date  = now()->addDays(2)->toDateString();
+
+        $this->makeBookingRequest($userA, $field, $date, [11])->assertSessionDoesntHaveErrors();
+
+        $responseB = $this->makeBookingRequest($userB, $field, $date, [10, 11, 12]);
+        $responseB->assertSessionHasErrors('hours');
+
+        $this->assertDatabaseMissing('bookings', ['user_id' => $userB->id]);
+        $this->assertDatabaseMissing('booking_slots', [
+            'field_id'  => $field->id,
+            'slot_date' => $date,
+            'slot_hour' => 10,
+        ]);
+        $this->assertEquals(1, BookingSlot::where('field_id', $field->id)->where('slot_date', $date)->count());
+    }
+
+    /**
+     * TC-INT-28 [BUG-006 / AC-3, AC-7]
+     * Admin mengubah status ke 'dibatalkan' melepas booking_slots, menghitung refund,
+     * dan memungkinkan slot dipesan ulang oleh user lain.
+     */
+    public function test_TC_INT_28_admin_cancelling_booking_releases_slots_and_calculates_refund(): void
+    {
+        $admin = $this->createUser('admin');
+        $userA = $this->createUser();
+        $userB = $this->createUser();
+        $field = $this->createField(['price_offpeak' => 100000]);
+        // Selalu pilih hari Senin minggu depan (> 24 jam, tanpa surcharge weekend)
+        $date  = Carbon::parse('next monday')->addWeek()->toDateString();
+
+        $this->makeBookingRequest($userA, $field, $date, [14], 'full')->assertSessionDoesntHaveErrors();
+        $booking = Booking::where('user_id', $userA->id)->firstOrFail();
+
+        $response = $this->actingAs($admin)->patch(
+            route('admin.bookings.update', $booking),
+            ['status' => 'dibatalkan']
+        );
+        $response->assertSessionDoesntHaveErrors();
+
+        $booking->refresh();
+        $this->assertEquals('dibatalkan', $booking->status);
+        $this->assertEquals(100000, $booking->refund_amount);
+        $this->assertNotNull($booking->cancelled_at);
+        $this->assertEquals(0, BookingSlot::where('booking_id', $booking->id)->count());
+
+        $this->makeBookingRequest($userB, $field, $date, [14], 'full')->assertSessionDoesntHaveErrors();
+    }
+
+    /**
+     * TC-INT-29 [BUG-006 / AC-7]
+     * Pembatalan ulang pada status 'dibatalkan' dan 'selesai' (user maupun admin) ditolak
+     * dengan status & refund tetap konsisten.
+     */
+    public function test_TC_INT_29_cancelled_and_completed_bookings_cannot_be_recancelled_or_reverted(): void
+    {
+        $admin = $this->createUser('admin');
+        $user  = $this->createUser();
+        $field = $this->createField();
+
+        $cancelled = Booking::factory()->cancelled()->create([
+            'user_id'       => $user->id,
+            'field_id'      => $field->id,
+            'amount_paid'   => 100000,
+            'refund_amount' => 50000,
+        ]);
+
+        // User mencoba cancel ulang booking dibatalkan
+        $userRes = $this->actingAs($user)->post(route('user.bookings.cancel', $cancelled));
+        $userRes->assertSessionHas('error');
+        $cancelled->refresh();
+        $this->assertEquals('dibatalkan', $cancelled->status);
+        $this->assertEquals(50000, $cancelled->refund_amount);
+
+        // Admin mencoba mengembalikan booking dibatalkan ke terkonfirmasi atau dibatalkan ulang
+        $this->actingAs($admin)
+            ->patch(route('admin.bookings.update', $cancelled), ['status' => 'terkonfirmasi'])
+            ->assertSessionHasErrors('status');
+        $this->actingAs($admin)
+            ->patch(route('admin.bookings.update', $cancelled), ['status' => 'dibatalkan'])
+            ->assertSessionHasErrors('status');
+
+        $completed = Booking::factory()->completed()->create([
+            'user_id'  => $user->id,
+            'field_id' => $field->id,
+        ]);
+        $this->actingAs($admin)
+            ->patch(route('admin.bookings.update', $completed), ['status' => 'dibatalkan'])
+            ->assertSessionHasErrors('status');
+        $this->assertEquals('selesai', $completed->fresh()->status);
+    }
+
+    /**
+     * TC-INT-30 [BUG-007 / AC-4]
+     * Server wajib menolak slot jam yang tidak kontinu (berjeda).
+     */
+    public function test_TC_INT_30_non_contiguous_hours_are_rejected_by_server(): void
+    {
+        $user  = $this->createUser();
+        $field = $this->createField();
+        $date  = now()->addDays(2)->toDateString();
+
+        $response = $this->makeBookingRequest($user, $field, $date, [10, 12]);
+        $response->assertSessionHasErrors('hours');
+
+        $this->assertDatabaseMissing('bookings', ['user_id' => $user->id]);
+    }
+
+    /**
+     * TC-INT-31 [BUG-007 / AC-4]
+     * Server wajib menolak jam yang sudah lewat pada hari ini dan menghapus duplikat pada array jam.
+     */
+    public function test_TC_INT_31_past_hours_today_are_rejected_and_duplicate_hours_are_deduplicated(): void
+    {
+        $user  = $this->createUser();
+        $field = $this->createField(['price_offpeak' => 100000, 'price_peak' => 120000]);
+
+        try {
+            // Gunakan hari Senin agar tarif tetap weekday (tanpa surcharge weekend)
+            $mondayNoon = Carbon::parse('next monday')->setTime(14, 30, 0);
+            Carbon::setTestNow($mondayNoon);
+            $today = $mondayNoon->toDateString();
+
+            // Jam 14:00 saat pukul 14:30 dianggap sudah lewat → wajib ditolak
+            $pastRes = $this->makeBookingRequest($user, $field, $today, [14]);
+            $pastRes->assertSessionHasErrors('hours');
+
+            // Jam duplikat [15, 15, 16] pada jam mendatang hari ini → deduplikasi menjadi [15, 16] (2 jam)
+            $dupRes = $this->makeBookingRequest($user, $field, $today, [15, 15, 16], 'full');
+            $dupRes->assertSessionDoesntHaveErrors();
+
+            $booking = Booking::where('user_id', $user->id)->firstOrFail();
+            $this->assertEquals(2, $booking->duration_hours);
+            $this->assertEquals(200000, $booking->total_price);
+            $this->assertEquals(2, BookingSlot::where('booking_id', $booking->id)->count());
+        } finally {
+            Carbon::setTestNow();
+        }
+    }
+
+    /**
+     * TC-INT-32 [BUG-006 / AC-7]
+     * Transisi valid state machine Admin: menunggu_pembayaran → terkonfirmasi → selesai,
+     * serta dibatalkan → refund.
+     */
+    public function test_TC_INT_32_valid_admin_status_transitions_succeed(): void
+    {
+        $admin = $this->createUser('admin');
+        $user  = $this->createUser();
+        $field = $this->createField();
+
+        $booking = Booking::factory()->create([
+            'user_id'  => $user->id,
+            'field_id' => $field->id,
+            'status'   => 'menunggu_pembayaran',
+        ]);
+
+        $this->actingAs($admin)
+            ->patch(route('admin.bookings.update', $booking), ['status' => 'terkonfirmasi'])
+            ->assertSessionDoesntHaveErrors();
+        $this->assertEquals('terkonfirmasi', $booking->fresh()->status);
+
+        $this->actingAs($admin)
+            ->patch(route('admin.bookings.update', $booking), ['status' => 'selesai'])
+            ->assertSessionDoesntHaveErrors();
+        $this->assertEquals('selesai', $booking->fresh()->status);
+
+        $cancelled = Booking::factory()->cancelled()->create([
+            'user_id'       => $user->id,
+            'field_id'      => $field->id,
+            'refund_amount' => 75000,
+        ]);
+        $this->actingAs($admin)
+            ->patch(route('admin.bookings.update', $cancelled), ['status' => 'refund'])
+            ->assertSessionDoesntHaveErrors();
+
+        $cancelled->refresh();
+        $this->assertEquals('refund', $cancelled->status);
+        $this->assertEquals(75000, $cancelled->refund_amount);
+    }
+
+    /**
+     * TC-INT-33 [UI Render / AC-1, AC-4, AC-6, AC-7]
+     * Memastikan halaman create booking, detail booking user, dan detail booking admin
+     * merender dengan benar (termasuk slot lewat, rincian slot tanpa duplikasi, dan status final).
+     */
+    public function test_TC_INT_33_booking_views_render_cleanly_across_states(): void
+    {
+        $admin = $this->createUser('admin');
+        $user  = $this->createUser();
+        $field = $this->createField(['price_offpeak' => 100000, 'price_peak' => 120000]);
+
+        try {
+            $mondayNoon = Carbon::parse('next monday')->setTime(14, 30, 0);
+            Carbon::setTestNow($mondayNoon);
+            $today = $mondayNoon->toDateString();
+
+            // Halaman create booking hari ini menampilkan label 'Lewat' untuk jam lampau
+            $createRes = $this->actingAs($user)->get(route('user.booking.create', ['field' => $field, 'date' => $today]));
+            $createRes->assertStatus(200);
+            $createRes->assertSee('Lewat');
+
+            // Buat booking 2 slot DP
+            $this->makeBookingRequest($user, $field, $today, [16, 17], 'dp')->assertSessionDoesntHaveErrors();
+            $booking = Booking::where('user_id', $user->id)->firstOrFail();
+
+            // Detail booking user menampilkan rincian kedua slot
+            $userShow = $this->actingAs($user)->get(route('user.bookings.show', $booking));
+            $userShow->assertStatus(200);
+            $userShow->assertSee('16:00');
+            $userShow->assertSee('17:00');
+            $userShow->assertSee('DP 50%');
+
+            // Detail booking admin menampilkan opsi transisi valid saat menunggu_pembayaran
+            $adminShow = $this->actingAs($admin)->get(route('admin.bookings.show', $booking));
+            $adminShow->assertStatus(200);
+            $adminShow->assertSee('Terkonfirmasi');
+            $adminShow->assertSee('Dibatalkan');
+
+            // Saat status final 'selesai', form ubah status terkunci
+            $booking->update(['status' => 'selesai']);
+            $adminFinalShow = $this->actingAs($admin)->get(route('admin.bookings.show', $booking));
+            $adminFinalShow->assertStatus(200);
+            $adminFinalShow->assertSee('bersifat final');
+        } finally {
+            Carbon::setTestNow();
+        }
     }
 }

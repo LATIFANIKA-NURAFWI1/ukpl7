@@ -57,14 +57,15 @@
       </elementProp>
     </TestPlan>
     <hashTree>
-      <ConfigTestElement guiclass="HttpDefaultsGui" testclass="ConfigTestElement" testname="HTTP Request Defaults" enabled="true">
-        <elementProp name="HTTPsampler.Arguments" elementType="Arguments" guiclass="HTTPArgumentsPanel" testclass="Arguments" testname="User Defined Variables" enabled="true">
-          <collectionProp name="Arguments.arguments"/>
-        </elementProp>
+      <ConfigTestElement guiclass="HttpDefaultsGui" testclass="ConfigTestElement" testname="HTTP Request Defaults">
         <stringProp name="HTTPSampler.domain">${HOST}</stringProp>
         <stringProp name="HTTPSampler.port">${PORT}</stringProp>
         <stringProp name="HTTPSampler.protocol">${PROTOCOL}</stringProp>
         <stringProp name="HTTPSampler.contentEncoding">UTF-8</stringProp>
+        <elementProp name="HTTPsampler.Arguments" elementType="Arguments" guiclass="HTTPArgumentsPanel" testclass="Arguments" testname="User Defined Variables">
+          <collectionProp name="Arguments.arguments"/>
+        </elementProp>
+        <stringProp name="HTTPSampler.implementation"></stringProp>
       </ConfigTestElement>
       <hashTree/>
       <CookieManager guiclass="CookiePanel" testclass="CookieManager" testname="HTTP Cookie Manager" enabled="true">
@@ -87,7 +88,7 @@
         <intProp name="ThreadGroup.ramp_time">1</intProp>
         <boolProp name="ThreadGroup.same_user_on_next_iteration">true</boolProp>
         <stringProp name="ThreadGroup.on_sample_error">continue</stringProp>
-        <elementProp name="ThreadGroup.main_controller" elementType="LoopController" guiclass="LoopControlPanel" testclass="LoopController" testname="Loop Controller" enabled="true">
+        <elementProp name="ThreadGroup.main_controller" elementType="LoopController" guiclass="LoopControlPanel" testclass="LoopController" testname="Loop Controller">
           <stringProp name="LoopController.loops">1</stringProp>
           <boolProp name="LoopController.continue_forever">false</boolProp>
         </elementProp>
@@ -99,7 +100,7 @@
           <stringProp name="HTTPSampler.method">GET</stringProp>
           <boolProp name="HTTPSampler.use_keepalive">true</boolProp>
           <boolProp name="HTTPSampler.postBodyRaw">false</boolProp>
-          <elementProp name="HTTPsampler.Arguments" elementType="Arguments" guiclass="HTTPArgumentsPanel" testclass="Arguments" testname="User Defined Variables" enabled="true">
+          <elementProp name="HTTPsampler.Arguments" elementType="Arguments" guiclass="HTTPArgumentsPanel" testclass="Arguments" testname="User Defined Variables">
             <collectionProp name="Arguments.arguments"/>
           </elementProp>
         </HTTPSamplerProxy>
@@ -107,10 +108,11 @@
           <RegexExtractor guiclass="RegexExtractorGui" testclass="RegexExtractor" testname="Extract Login CSRF Token" enabled="true">
             <stringProp name="RegexExtractor.useHeaders">false</stringProp>
             <stringProp name="RegexExtractor.refname">csrf_token</stringProp>
-            <stringProp name="RegexExtractor.regex">name="_token"\s+value="([^"]+)"</stringProp>
+            <stringProp name="RegexExtractor.regex">name=&quot;_token&quot;\s+value=&quot;([^&quot;]+)&quot;</stringProp>
             <stringProp name="RegexExtractor.template">$1$</stringProp>
             <stringProp name="RegexExtractor.default">TOKEN_NOT_FOUND</stringProp>
             <stringProp name="RegexExtractor.match_number">1</stringProp>
+            <boolProp name="RegexExtractor.default_empty_value">false</boolProp>
           </RegexExtractor>
           <hashTree/>
         </hashTree>
@@ -120,7 +122,7 @@
           <stringProp name="HTTPSampler.method">POST</stringProp>
           <boolProp name="HTTPSampler.use_keepalive">true</boolProp>
           <boolProp name="HTTPSampler.postBodyRaw">false</boolProp>
-          <elementProp name="HTTPsampler.Arguments" elementType="Arguments" guiclass="HTTPArgumentsPanel" testclass="Arguments" testname="User Defined Variables" enabled="true">
+          <elementProp name="HTTPsampler.Arguments" elementType="Arguments" guiclass="HTTPArgumentsPanel" testclass="Arguments" testname="User Defined Variables">
             <collectionProp name="Arguments.arguments">
               <elementProp name="_token" elementType="HTTPArgument">
                 <boolProp name="HTTPArgument.always_encode">true</boolProp>
@@ -149,7 +151,7 @@
         <hashTree>
           <ResponseAssertion guiclass="AssertionGui" testclass="ResponseAssertion" testname="Assert Login Berhasil" enabled="true">
             <collectionProp name="Asserion.test_strings">
-              <stringProp name="dashboard">Dashboard</stringProp>
+              <stringProp name="956107380">Dashboard</stringProp>
             </collectionProp>
             <stringProp name="Assertion.custom_message">Login gagal — pastikan DB sudah di-seed (user@sportbook.com / password)</stringProp>
             <stringProp name="Assertion.test_field">Assertion.response_data</stringProp>
@@ -164,7 +166,7 @@
           <stringProp name="HTTPSampler.method">GET</stringProp>
           <boolProp name="HTTPSampler.use_keepalive">true</boolProp>
           <boolProp name="HTTPSampler.postBodyRaw">false</boolProp>
-          <elementProp name="HTTPsampler.Arguments" elementType="Arguments" guiclass="HTTPArgumentsPanel" testclass="Arguments" testname="User Defined Variables" enabled="true">
+          <elementProp name="HTTPsampler.Arguments" elementType="Arguments" guiclass="HTTPArgumentsPanel" testclass="Arguments" testname="User Defined Variables">
             <collectionProp name="Arguments.arguments">
               <elementProp name="date" elementType="HTTPArgument">
                 <boolProp name="HTTPArgument.always_encode">true</boolProp>
@@ -180,10 +182,11 @@
           <RegexExtractor guiclass="RegexExtractorGui" testclass="RegexExtractor" testname="Extract Booking CSRF Token" enabled="true">
             <stringProp name="RegexExtractor.useHeaders">false</stringProp>
             <stringProp name="RegexExtractor.refname">booking_token</stringProp>
-            <stringProp name="RegexExtractor.regex">name="_token"\s+value="([^"]+)"</stringProp>
+            <stringProp name="RegexExtractor.regex">name=&quot;_token&quot;\s+value=&quot;([^&quot;]+)&quot;</stringProp>
             <stringProp name="RegexExtractor.template">$1$</stringProp>
             <stringProp name="RegexExtractor.default">TOKEN_NOT_FOUND</stringProp>
             <stringProp name="RegexExtractor.match_number">1</stringProp>
+            <boolProp name="RegexExtractor.default_empty_value">false</boolProp>
           </RegexExtractor>
           <hashTree/>
         </hashTree>
@@ -193,7 +196,7 @@
           <stringProp name="HTTPSampler.method">POST</stringProp>
           <boolProp name="HTTPSampler.use_keepalive">true</boolProp>
           <boolProp name="HTTPSampler.postBodyRaw">false</boolProp>
-          <elementProp name="HTTPsampler.Arguments" elementType="Arguments" guiclass="HTTPArgumentsPanel" testclass="Arguments" testname="User Defined Variables" enabled="true">
+          <elementProp name="HTTPsampler.Arguments" elementType="Arguments" guiclass="HTTPArgumentsPanel" testclass="Arguments" testname="User Defined Variables">
             <collectionProp name="Arguments.arguments">
               <elementProp name="_token" elementType="HTTPArgument">
                 <boolProp name="HTTPArgument.always_encode">true</boolProp>
@@ -244,9 +247,9 @@
           <hashTree/>
           <ResponseAssertion guiclass="AssertionGui" testclass="ResponseAssertion" testname="Assert Tidak Ada Pesan SQL Mentah" enabled="true">
             <collectionProp name="Asserion.test_strings">
-              <stringProp name="sqlstate">SQLSTATE</stringProp>
-              <stringProp name="dupentry">Duplicate entry</stringProp>
-              <stringProp name="srv500">Internal Server Error</stringProp>
+              <stringProp name="-247240829">SQLSTATE</stringProp>
+              <stringProp name="-1773671171">Duplicate entry</stringProp>
+              <stringProp name="-27349170">Internal Server Error</stringProp>
             </collectionProp>
             <stringProp name="Assertion.custom_message">Pesan error teknis/SQL muncul di response!</stringProp>
             <stringProp name="Assertion.test_field">Assertion.response_data</stringProp>
@@ -256,7 +259,7 @@
           <hashTree/>
           <ResponseAssertion guiclass="AssertionGui" testclass="ResponseAssertion" testname="Assert Respons Valid (Berhasil atau Ditolak Rapi)" enabled="true">
             <collectionProp name="Asserion.test_strings">
-              <stringProp name="validmsg">Booking berhasil dibuat|sudah dipesan</stringProp>
+              <stringProp name="-318081559">Booking berhasil dibuat|sudah dipesan</stringProp>
             </collectionProp>
             <stringProp name="Assertion.custom_message">Response tidak menunjukkan booking sukses maupun penolakan slot yang jelas</stringProp>
             <stringProp name="Assertion.test_field">Assertion.response_data</stringProp>
@@ -271,7 +274,7 @@
         <intProp name="ThreadGroup.ramp_time">5</intProp>
         <boolProp name="ThreadGroup.same_user_on_next_iteration">true</boolProp>
         <stringProp name="ThreadGroup.on_sample_error">continue</stringProp>
-        <elementProp name="ThreadGroup.main_controller" elementType="LoopController" guiclass="LoopControlPanel" testclass="LoopController" testname="Loop Controller" enabled="true">
+        <elementProp name="ThreadGroup.main_controller" elementType="LoopController" guiclass="LoopControlPanel" testclass="LoopController" testname="Loop Controller">
           <stringProp name="LoopController.loops">2</stringProp>
           <boolProp name="LoopController.continue_forever">false</boolProp>
         </elementProp>
@@ -283,7 +286,7 @@
           <stringProp name="HTTPSampler.method">GET</stringProp>
           <boolProp name="HTTPSampler.use_keepalive">true</boolProp>
           <boolProp name="HTTPSampler.postBodyRaw">false</boolProp>
-          <elementProp name="HTTPsampler.Arguments" elementType="Arguments" guiclass="HTTPArgumentsPanel" testclass="Arguments" testname="User Defined Variables" enabled="true">
+          <elementProp name="HTTPsampler.Arguments" elementType="Arguments" guiclass="HTTPArgumentsPanel" testclass="Arguments" testname="User Defined Variables">
             <collectionProp name="Arguments.arguments"/>
           </elementProp>
         </HTTPSamplerProxy>
@@ -294,7 +297,7 @@
           <stringProp name="HTTPSampler.method">GET</stringProp>
           <boolProp name="HTTPSampler.use_keepalive">true</boolProp>
           <boolProp name="HTTPSampler.postBodyRaw">false</boolProp>
-          <elementProp name="HTTPsampler.Arguments" elementType="Arguments" guiclass="HTTPArgumentsPanel" testclass="Arguments" testname="User Defined Variables" enabled="true">
+          <elementProp name="HTTPsampler.Arguments" elementType="Arguments" guiclass="HTTPArgumentsPanel" testclass="Arguments" testname="User Defined Variables">
             <collectionProp name="Arguments.arguments"/>
           </elementProp>
         </HTTPSamplerProxy>
@@ -302,10 +305,11 @@
           <RegexExtractor guiclass="RegexExtractorGui" testclass="RegexExtractor" testname="Extract Login CSRF Token" enabled="true">
             <stringProp name="RegexExtractor.useHeaders">false</stringProp>
             <stringProp name="RegexExtractor.refname">csrf_token</stringProp>
-            <stringProp name="RegexExtractor.regex">name="_token"\s+value="([^"]+)"</stringProp>
+            <stringProp name="RegexExtractor.regex">name=&quot;_token&quot;\s+value=&quot;([^&quot;]+)&quot;</stringProp>
             <stringProp name="RegexExtractor.template">$1$</stringProp>
             <stringProp name="RegexExtractor.default">TOKEN_NOT_FOUND</stringProp>
             <stringProp name="RegexExtractor.match_number">1</stringProp>
+            <boolProp name="RegexExtractor.default_empty_value">false</boolProp>
           </RegexExtractor>
           <hashTree/>
         </hashTree>
@@ -315,7 +319,7 @@
           <stringProp name="HTTPSampler.method">POST</stringProp>
           <boolProp name="HTTPSampler.use_keepalive">true</boolProp>
           <boolProp name="HTTPSampler.postBodyRaw">false</boolProp>
-          <elementProp name="HTTPsampler.Arguments" elementType="Arguments" guiclass="HTTPArgumentsPanel" testclass="Arguments" testname="User Defined Variables" enabled="true">
+          <elementProp name="HTTPsampler.Arguments" elementType="Arguments" guiclass="HTTPArgumentsPanel" testclass="Arguments" testname="User Defined Variables">
             <collectionProp name="Arguments.arguments">
               <elementProp name="_token" elementType="HTTPArgument">
                 <boolProp name="HTTPArgument.always_encode">true</boolProp>
@@ -348,7 +352,7 @@
           <stringProp name="HTTPSampler.method">GET</stringProp>
           <boolProp name="HTTPSampler.use_keepalive">true</boolProp>
           <boolProp name="HTTPSampler.postBodyRaw">false</boolProp>
-          <elementProp name="HTTPsampler.Arguments" elementType="Arguments" guiclass="HTTPArgumentsPanel" testclass="Arguments" testname="User Defined Variables" enabled="true">
+          <elementProp name="HTTPsampler.Arguments" elementType="Arguments" guiclass="HTTPArgumentsPanel" testclass="Arguments" testname="User Defined Variables">
             <collectionProp name="Arguments.arguments"/>
           </elementProp>
         </HTTPSamplerProxy>
@@ -359,7 +363,7 @@
           <stringProp name="HTTPSampler.method">GET</stringProp>
           <boolProp name="HTTPSampler.use_keepalive">true</boolProp>
           <boolProp name="HTTPSampler.postBodyRaw">false</boolProp>
-          <elementProp name="HTTPsampler.Arguments" elementType="Arguments" guiclass="HTTPArgumentsPanel" testclass="Arguments" testname="User Defined Variables" enabled="true">
+          <elementProp name="HTTPsampler.Arguments" elementType="Arguments" guiclass="HTTPArgumentsPanel" testclass="Arguments" testname="User Defined Variables">
             <collectionProp name="Arguments.arguments"/>
           </elementProp>
         </HTTPSamplerProxy>
